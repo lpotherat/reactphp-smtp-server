@@ -11,6 +11,7 @@
         }
     ],
     "require": {
+        "php": ">=8.1",
         "ext-openssl": "*",
         "react/event-loop": "^v1.3.0",
         "react/socket": "^v1.11.0",
