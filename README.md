@@ -170,7 +170,7 @@ catch(\Exception $e) {
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:lpotherat/react-smtp.git"
+            "url": "git@github.com:lpotherat/reactphp-smtp-server.git"
         }
     ]
 }
