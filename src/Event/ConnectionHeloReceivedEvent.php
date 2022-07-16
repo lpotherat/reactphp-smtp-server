@@ -1,41 +1,19 @@
 <?php
 
-namespace Smalot\Smtp\Server\Event;
+namespace Lpotherat\Smtp\Server\Event;
 
-use Smalot\Smtp\Server\Connection;
+use Lpotherat\Smtp\Server\Connection;
 
 /**
  * Class ConnectionHeloReceivedEvent
- * @package Smalot\Smtp\Server\Event
  */
-class ConnectionHeloReceivedEvent extends Event
+class ConnectionHeloReceivedEvent
 {
-    /**
-     * @var Connection
-     */
-    protected $connection;
-
-    /**
-     * @var string
-     */
-    protected $domain;
 
     /**
      * ConnectionHeloReceivedEvent constructor.
-     * @param Connection $connection
      * @param string $domain
      */
-    public function __construct(Connection $connection, $domain)
-    {
-        $this->connection = $connection;
-        $this->domain = $domain;
-    }
+    public function __construct(public readonly string $domain){}
 
-    /**
-     * @return string
-     */
-    public function getDomain()
-    {
-        return $this->domain;
-    }
 }

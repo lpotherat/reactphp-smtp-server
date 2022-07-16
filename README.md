@@ -2,28 +2,30 @@
 
 SMTP Server based on ReactPHP.
 
-Widely inspired from [SAM-IT/react-smtp](https://github.com/SAM-IT/react-smtp).
+Since those repos seem to be abandonned, I pushed a new version freely adapted to use PHP 8.1
+new features, and to be more compliant with PSR interfaces (PSR-3 for logging, PSR-14 for events).
+* Widely inspired from [smalot/smtp-server](https://github.com/smalot/smtp-server).
+* Wich was widely inspired from [SAM-IT/react-smtp](https://github.com/SAM-IT/react-smtp).
 
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/?branch=master)
-[![Code Coverage](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/badges/coverage.png?b=master)](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/?branch=master)
-[![Build Status](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/badges/build.png?b=master)](https://scrutinizer-ci.com/g/SAM-IT/react-smtp/build-status/master)
 
 Features:
 * supports many concurrent SMTP connections
 * supports anonymous connections
 * supports PLAIN, LOGIN and CRAM-MD5 authentication methods
-* use Symfony event dispatcher
+* use PSR-14 events dispatcher
 
-It is advised to install additionnal PHP libraries:
-* [events](https://pecl.php.net/package/event)
-* [mailparse](https://pecl.php.net/package/mailparse)
+## Limitations 
+
+The objective of this library is not to build a full featured SMTP Server, but instead to have a simple 
+way to catch mails sent to it and process them as wanted.
+So this server does not actually sends the mails !
 
 ## Security
 
 By default, `username` and `password` are not checked. However, you can override the `Server` class to implement your own logic.
 
 ````php
-class MyServer extends \Smalot\Smtp\Server\Server
+class MyServer extends \Lpotherat\Smtp\Server\Server
 {
     /**
      * @param Connection $connection
@@ -57,25 +59,61 @@ class MyServer extends \Smalot\Smtp\Server\Server
 ### Server side - launcher
 
 ````php
-include 'vendor/autoload.php';
+use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\ListenerProviderInterface;
+use Psr\EventDispatcher\StoppableEventInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerTrait;
+use React\Socket\SocketServer;
+use Lpotherat\Smtp\Server\Connection;
+use Lpotherat\Smtp\Server\Event\LogSubscriber;
+use Lpotherat\Smtp\Server\Server;
+
+include '../vendor/autoload.php';
+
+//prevent web execution
+if (php_sapi_name() !== 'cli'){
+    exit();
+}
 
 try {
-    $dispatcher = new \Symfony\Component\EventDispatcher\EventDispatcher();
+    // Simple logger to echo all logs in console
+    $logger = new class implements LoggerInterface {
+        use LoggerTrait;
+        public function log($level, string|\Stringable $message, array $context = []): void
+        {
+            echo "[$level] $message\n";
+        }
+    };
 
-    $logger = new \Monolog\Logger('log');
-    $dispatcher->addSubscriber(new \Smalot\Smtp\Server\Event\LogSubscriber($logger));
-    
-    $loop = React\EventLoop\Factory::create();
-    $server = new \Smalot\Smtp\Server\Server($loop, $dispatcher);
-    // Enable 3 authentication methods.
-    $server->authMethods = [
-      \Smalot\Smtp\Server\Connection::AUTH_METHOD_LOGIN,
-      \Smalot\Smtp\Server\Connection::AUTH_METHOD_PLAIN,
-      \Smalot\Smtp\Server\Connection::AUTH_METHOD_CRAM_MD5,
-    ];
-    // Listen on port 25.
-    $server->listen(25);
-    $loop->run();
+    //Simple dispatcher to listen to all events of the mail server for logging
+    $dispatcher = new class(new LogSubscriber($logger)) implements EventDispatcherInterface{
+        public function __construct(
+            private ?ListenerProviderInterface $listenerProvider = null){}
+
+        public function dispatch(object $event):void
+        {
+            $listeners = $this->listenerProvider->getListenersForEvent($event);
+            /** @var callable $listener */
+            foreach ($listeners as $listener) {
+                $listener($event);
+                if ($event instanceof StoppableEventInterface
+                    && $event->isPropagationStopped()) {
+                    break;
+                }
+            }
+        }
+    };
+
+    //Starts the mail server
+    $server = new Server(
+        server: new SocketServer(uri: '127.0.0.1:1025'),
+        authMethods: [
+            Connection::AUTH_METHOD_CRAM_MD5,
+            Connection::AUTH_METHOD_PLAIN,
+            Connection::AUTH_METHOD_LOGIN,
+        ],
+        dispatcher: $dispatcher);
 }
 catch(\Exception $e) {
     var_dump($e);
@@ -92,19 +130,19 @@ try {
 
     $mail->isSMTP();
     $mail->Host = 'localhost';
-    $mail->Port = 25;
+    $mail->Port = 1025;
     $mail->SMTPDebug = true;
 
     $mail->SMTPAuth = true;
     $mail->Username = "foo@gmail.com";
     $mail->Password = "foo@gmail.com";
 
-    $mail->setFrom('from@example.com', 'Mailer');
-    $mail->addAddress('joe@example.net', 'Joe User');     // Add a recipient
-    $mail->addAddress('ellen@example.com');               // Name is optional
-    $mail->addReplyTo('info@example.com', 'Information');
-    $mail->addCC('cc@example.com');
-    $mail->addBCC('bcc@example.com');
+    $mail->setFrom('from@example.org', 'Mailer');
+    $mail->addAddress('joe@example.org', 'Joe User');     // Add a recipient
+    $mail->addAddress('ellen@example.org');               // Name is optional
+    $mail->addReplyTo('info@example.org', 'Information');
+    $mail->addCC('cc@example.org');
+    $mail->addBCC('bcc@example.org');
 
     $mail->Subject = 'Here is the subject';
     $mail->Body    = 'This is the HTML message body <b>in bold!</b>';
@@ -124,31 +162,16 @@ catch(\Exception $e) {
 
 ### Composer
 
-Sample project code for both `client` and `server` parts.
-
 ````json
 {
     "require": {
-        "react/event-loop": "^0.4.2",
-        "smalot/smtp-server": "dev-master",
-        "phpmailer/phpmailer": "^5.2"
+        "lpotherat/reactphp-smtp-server": "dev-master"
     },
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:smalot/react-smtp.git"
+            "url": "git@github.com:lpotherat/react-smtp.git"
         }
     ]
 }
 ````
-
-### Decode message
-
-Using the `"php-mime-mail-parser/php-mime-mail-parser": "^2.6"` package, you can parse the whole message.
-
-doc: https://packagist.org/packages/php-mime-mail-parser/php-mime-mail-parser
-
-However, need to install the `mailparse` PHP Extension.
-To do such a thing, you need to install the `mbstring` PHP Extension, compile it with `PEAR` and enable the `mailparse` extension after the `mbstring` (using a higher digit).
-
-It should be necessary to alter source code to remove the check on `mbstring` existence due to an error in this check.

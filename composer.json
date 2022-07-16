@@ -1,14 +1,10 @@
 {
-    "name": "smalot/smtp-server",
+    "name": "lpotherat/reactphp-smtp-server",
     "description" : "SMTP Server based on ReactPHP",
     "keywords": ["smtp", "server", "reactphp", "event", "parse"],
     "license" : "MIT",
     "type": "library",
     "authors": [
-        {
-            "name": "Sebastien Malot",
-            "email": "sebastien@malot.fr"
-        },
         {
             "name": "Léonard POTHERAT",
             "email": "l.potherat@planetb.fr"
@@ -21,15 +17,14 @@
         "psr/event-dispatcher": "^1.0.0",
         "psr/log": "^3.0.0"
     },
-    "require-dev": {
-        "phpmailer/phpmailer": "^v6.6.3"
-    },
     "suggest": {
+        "monolog/monolog": "PSR-3 Logging library",
+        "league/event": "PSR-14 event dispatcher",
         "php-mime-mail-parser/php-mime-mail-parser": "Mail parsing (mime multipart, attachments, ...)."
     },
     "autoload": {
         "psr-4" : {
-            "Smalot\\Smtp\\Server\\" : ["src"]
+            "Lpotherat\\Smtp\\Server\\": ["src"]
         }
     }
 }

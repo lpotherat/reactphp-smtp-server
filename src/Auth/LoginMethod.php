@@ -1,10 +1,9 @@
 <?php
 
-namespace Smalot\Smtp\Server\Auth;
+namespace Lpotherat\Smtp\Server\Auth;
 
 /**
  * Class LoginMethod
- * @package Smalot\Smtp\Server\Auth
  */
 class LoginMethod implements MethodInterface
 {

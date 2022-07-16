@@ -1,12 +1,9 @@
 <?php
 
-namespace Smalot\Smtp\Server\Auth;
-
-use JetBrains\PhpStorm\Pure;
+namespace Lpotherat\Smtp\Server\Auth;
 
 /**
  * Class CramMd5Method
- * @package Smalot\Smtp\Server\Auth
  */
 class CramMd5Method implements MethodInterface
 {

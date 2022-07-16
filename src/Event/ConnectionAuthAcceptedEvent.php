@@ -1,50 +1,18 @@
 <?php
 
-namespace Smalot\Smtp\Server\Event;
+namespace Lpotherat\Smtp\Server\Event;
 
-use Smalot\Smtp\Server\Auth\MethodInterface;
-use Smalot\Smtp\Server\Connection;
+use Lpotherat\Smtp\Server\Auth\MethodInterface;
 
 /**
  * Class ConnectionAuthAcceptedEvent
- * @package Smalot\Smtp\Server\Event
  */
-class ConnectionAuthAcceptedEvent extends Event
+class ConnectionAuthAcceptedEvent
 {
     /**
-     * @var Connection
-     */
-    protected $connection;
-
-    /**
-     * @var MethodInterface
-     */
-    protected $authMethod;
-
-    /**
      * ConnectionAuthAcceptedEvent constructor.
-     * @param Connection $connection
      * @param MethodInterface $authMethod
      */
-    public function __construct(Connection $connection, MethodInterface $authMethod)
-    {
-        $this->connection = $connection;
-        $this->authMethod = $authMethod;
-    }
+    public function __construct(public readonly MethodInterface $authMethod){}
 
-    /**
-     * @return Connection
-     */
-    public function getConnection()
-    {
-        return $this->connection;
-    }
-
-    /**
-     * @return MethodInterface
-     */
-    public function getAuthMethod()
-    {
-        return $this->authMethod;
-    }
 }

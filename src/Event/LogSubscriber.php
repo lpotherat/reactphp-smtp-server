@@ -1,16 +1,14 @@
 <?php
 
-namespace Smalot\Smtp\Server\Event;
+namespace Lpotherat\Smtp\Server\Event;
 
 use Psr\EventDispatcher\ListenerProviderInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
-use Smalot\Smtp\Server\Events;
 
 /**
  * Class LogSubscriber
- * @package Smalot\Smtp\Server\Event
  */
 class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
 {
@@ -39,7 +37,6 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
             ConnectionHeloReceivedEvent::class => [$this->onConnectionHeloReceived(...)],
             ConnectionLineReceivedEvent::class => [$this->onConnectionLineReceived(...)],
             ConnectionRcptReceivedEvent::class => [$this->onConnectionRcptReceived(...)],
-            MessageSentEvent::class => [$this->onMessageSent(...)],
             MessageReceivedEvent::class => [$this->onMessageReceived(...)],
         };
     }
@@ -49,7 +46,7 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionChangeState(ConnectionChangeStateEvent $event)
     {
-        $this->logger->debug('State changed from '.$event->getOldState().' to '.$event->getNewState());
+        $this->logger->debug("State changed from $event->oldState to $event->newState");
     }
 
     /**
@@ -57,7 +54,7 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionHeloReceived(ConnectionHeloReceivedEvent $event)
     {
-        $this->logger->debug('Domain: '.$event->getDomain());
+        $this->logger->debug("Domain: $event->domain");
     }
 
     /**
@@ -65,9 +62,9 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionFromReceived(ConnectionFromReceivedEvent $event)
     {
-        $mail = $event->getMail();
-        $name = $event->getName() ?: $mail;
-        $this->logger->debug('From: '.$name.' <'.$mail.'>');
+        $mail = $event->mail;
+        $name = $event->name ?: $mail;
+        $this->logger->debug("From: $name <$mail>");
     }
 
     /**
@@ -75,9 +72,9 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionRcptReceived(ConnectionRcptReceivedEvent $event)
     {
-        $mail = $event->getMail();
-        $name = $event->getName() ?: $mail;
-        $this->logger->debug('Rcpt: '.$name.' <'.$mail.'>');
+        $mail = $event->mail;
+        $name = $event->name ?: $mail;
+        $this->logger->debug("Rcpt: $name <$mail>");
     }
 
     /**
@@ -85,7 +82,7 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionLineReceived(ConnectionLineReceivedEvent $event)
     {
-        $this->logger->debug('Line: '.$event->getLine());
+        $this->logger->debug("Line: $event->line");
     }
 
     /**
@@ -93,8 +90,8 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionAuthAccepted(ConnectionAuthAcceptedEvent $event)
     {
-        $this->logger->debug('Auth used: '.$event->getAuthMethod()->getType());
-        $this->logger->info('User granted: '.$event->getAuthMethod()->getUsername());
+        $this->logger->debug("Auth used: {$event->authMethod->getType()}");
+        $this->logger->info("User granted: {$event->authMethod->getUsername()}");
     }
 
     /**
@@ -102,8 +99,8 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onConnectionAuthRefused(ConnectionAuthRefusedEvent $event)
     {
-        $this->logger->debug('Auth used: '.$event->getAuthMethod()->getType());
-        $this->logger->error('User refused: '.$event->getAuthMethod()->getUsername());
+        $this->logger->debug("Auth used: {$event->authMethod->getType()}");
+        $this->logger->error("User refused: {$event->authMethod->getUsername()}");
     }
 
     /**
@@ -111,15 +108,8 @@ class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
      */
     public function onMessageReceived(MessageReceivedEvent $event)
     {
-        $this->logger->info('Message received via smtp: '.strlen($event->getMessage()).' bytes');
-    }
-
-    /**
-     * @param MessageSentEvent $event
-     */
-    public function onMessageSent(MessageSentEvent $event)
-    {
-        $this->logger->info('Message sent via sendmail: '.strlen($event->getMessage()).' bytes');
+        $msgLength = strlen($event->message);
+        $this->logger->info("Message received via smtp: $msgLength bytes");
     }
 
 }

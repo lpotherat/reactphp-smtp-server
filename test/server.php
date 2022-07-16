@@ -6,9 +6,9 @@ use Psr\EventDispatcher\StoppableEventInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
 use React\Socket\SocketServer;
-use Smalot\Smtp\Server\Connection;
-use Smalot\Smtp\Server\Event\LogSubscriber;
-use Smalot\Smtp\Server\Server;
+use Lpotherat\Smtp\Server\Connection;
+use Lpotherat\Smtp\Server\Event\LogSubscriber;
+use Lpotherat\Smtp\Server\Server;
 
 include '../vendor/autoload.php';
 

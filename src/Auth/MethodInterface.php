@@ -1,10 +1,9 @@
 <?php
 
-namespace Smalot\Smtp\Server\Auth;
+namespace Lpotherat\Smtp\Server\Auth;
 
 /**
  * Interface MethodInterface
- * @package Smalot\Smtp\Server\Auth
  */
 interface MethodInterface
 {

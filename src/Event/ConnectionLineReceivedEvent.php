@@ -1,41 +1,15 @@
 <?php
 
-namespace Smalot\Smtp\Server\Event;
-
-use Smalot\Smtp\Server\Connection;
+namespace Lpotherat\Smtp\Server\Event;
 
 /**
  * Class ConnectionLineReceivedEvent
- * @package Smalot\Smtp\Server\Event
  */
-class ConnectionLineReceivedEvent extends Event
+class ConnectionLineReceivedEvent
 {
     /**
-     * @var Connection
-     */
-    protected $connection;
-
-    /**
-     * @var string
-     */
-    protected $line;
-
-    /**
      * ConnectionLineReceivedEvent constructor.
-     * @param Connection $connection
      * @param string $line
      */
-    public function __construct(Connection $connection, $line)
-    {
-        $this->connection = $connection;
-        $this->line = $line;
-    }
-
-    /**
-     * @return string
-     */
-    public function getLine()
-    {
-        return $this->line;
-    }
+    public function __construct(public readonly string $line){}
 }

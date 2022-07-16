@@ -1,15 +1,14 @@
 <?php
 
-namespace Smalot\Smtp\Server;
+namespace Lpotherat\Smtp\Server;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
 use React\Socket\ConnectionInterface;
 use React\Socket\ServerInterface;
-use Smalot\Smtp\Server\Auth\MethodInterface;
+use Lpotherat\Smtp\Server\Auth\MethodInterface;
 
 /**
  * Class Server
- * @package Smalot\Smtp\Server
  */
 class Server
 {
@@ -20,42 +19,20 @@ class Server
      * @param int $recipientLimit
      * @param int $bannerDelay
      * @param array $authMethods
+     * @param string $banner
      * @param EventDispatcherInterface|null $dispatcher
      */
     public function __construct(
         ServerInterface $server,
-        private int $recipientLimit = 100,
-        private int $bannerDelay = 0,
-        private array $authMethods = [],
+        public readonly int $recipientLimit = 100,
+        public readonly int $bannerDelay = 0,
+        public readonly array $authMethods = [],
+        public readonly string $banner = "Welcome to ReactPHP SMT Server",
         ?EventDispatcherInterface $dispatcher=null)
     {
         $server->on('connection',function(ConnectionInterface $connection) use ($dispatcher){
             new Connection($connection,$this,$dispatcher);
         });
-    }
-
-    /**
-     * @return int
-     */
-    public function getRecipientLimit(): int
-    {
-        return $this->recipientLimit;
-    }
-
-    /**
-     * @return int
-     */
-    public function getBannerDelay(): int
-    {
-        return $this->bannerDelay;
-    }
-
-    /**
-     * @return array
-     */
-    public function getAuthMethods(): array
-    {
-        return $this->authMethods;
     }
 
     /**

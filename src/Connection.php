@@ -1,29 +1,27 @@
 <?php
 
-namespace Smalot\Smtp\Server;
+namespace Lpotherat\Smtp\Server;
 
 use DomainException;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
 use React\Socket\ConnectionInterface;
-use Smalot\Smtp\Server\Auth\CramMd5Method;
-use Smalot\Smtp\Server\Auth\LoginMethod;
-use Smalot\Smtp\Server\Auth\MethodInterface;
-use Smalot\Smtp\Server\Auth\PlainMethod;
-use Smalot\Smtp\Server\Event\ConnectionAuthAcceptedEvent;
-use Smalot\Smtp\Server\Event\ConnectionAuthRefusedEvent;
-use Smalot\Smtp\Server\Event\ConnectionChangeStateEvent;
-use Smalot\Smtp\Server\Event\ConnectionFromReceivedEvent;
-use Smalot\Smtp\Server\Event\ConnectionHeloReceivedEvent;
-use Smalot\Smtp\Server\Event\ConnectionLineReceivedEvent;
-use Smalot\Smtp\Server\Event\ConnectionRcptReceivedEvent;
-use Smalot\Smtp\Server\Event\Event;
-use Smalot\Smtp\Server\Event\MessageReceivedEvent;
+use Lpotherat\Smtp\Server\Auth\CramMd5Method;
+use Lpotherat\Smtp\Server\Auth\LoginMethod;
+use Lpotherat\Smtp\Server\Auth\MethodInterface;
+use Lpotherat\Smtp\Server\Auth\PlainMethod;
+use Lpotherat\Smtp\Server\Event\ConnectionAuthAcceptedEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionAuthRefusedEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionChangeStateEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionFromReceivedEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionHeloReceivedEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionLineReceivedEvent;
+use Lpotherat\Smtp\Server\Event\ConnectionRcptReceivedEvent;
+use Lpotherat\Smtp\Server\Event\MessageReceivedEvent;
 
 /**
  * Class Connection
- * @package Smalot\Smtp\Server
  */
 class Connection
 {
@@ -183,9 +181,10 @@ class Connection
         $this->dispatcher = $dispatcher;
         $this->server = $server;
 
-        $this->recipientLimit = $this->server->getRecipientLimit();
-        $this->bannerDelay = $this->server->getBannerDelay();
-        $this->authMethods = $this->server->getAuthMethods();
+        $this->recipientLimit = $this->server->recipientLimit;
+        $this->bannerDelay = $this->server->bannerDelay;
+        $this->authMethods = $this->server->authMethods;
+        $this->banner = $this->server->banner;
 
         $this->connection->on('data', $this->handleData(...));
         $this->reset(self::STATUS_NEW);
@@ -214,10 +213,10 @@ class Connection
     }
 
     /**
-     * @param Event $event
+     * @param object $event
      * @return $this
      */
-    protected function dispatchEvent(Event $event): static
+    protected function dispatchEvent(object $event): static
     {
         $this->dispatcher?->dispatch($event);
 
@@ -234,7 +233,7 @@ class Connection
             $oldState = $this->state;
             $this->state = $state;
 
-            $this->dispatchEvent(new ConnectionChangeStateEvent($this, $oldState, $state));
+            $this->dispatchEvent(new ConnectionChangeStateEvent($oldState, $state));
         }
 
         return $this;
@@ -338,7 +337,7 @@ class Connection
             $this->changeState(self::STATUS_INIT);
         }
 
-        $event = new ConnectionHeloReceivedEvent($this, trim($domain));
+        $event = new ConnectionHeloReceivedEvent(trim($domain));
         $this->dispatchEvent($event);
 
         $this->sendReply(250, $messages);
@@ -405,23 +404,31 @@ class Connection
 
         switch ($this->authMethod->getType()) {
             case self::AUTH_METHOD_PLAIN:
-                $this->authMethod->decodeToken($value);
+                if ($this->authMethod instanceof PlainMethod) {
+                    $this->authMethod->decodeToken($value);
+                }
                 $this->checkAuth();
                 break;
 
             case self::AUTH_METHOD_LOGIN:
                 if (!$this->authMethod->getUsername()) {
-                    $this->authMethod->setUsername($value);
+                    if ($this->authMethod instanceof LoginMethod) {
+                        $this->authMethod->setUsername($value);
+                    }
                     // Send 'Password:'.
                     $this->sendReply(334, 'UGFzc3dvcmQ6');
                 } else {
-                    $this->authMethod->setPassword($value);
+                    if ($this->authMethod instanceof LoginMethod) {
+                        $this->authMethod->setPassword($value);
+                    }
                     $this->checkAuth();
                 }
                 break;
 
             case self::AUTH_METHOD_CRAM_MD5:
-                $this->authMethod->decodeToken($value);
+                if ($this->authMethod instanceof CramMd5Method) {
+                    $this->authMethod->decodeToken($value);
+                }
                 $this->checkAuth();
                 break;
 
@@ -450,7 +457,7 @@ class Connection
             $this->from = $matches['email'];
             $this->sendReply(250, 'MAIL OK');
 
-            $this->dispatchEvent(new ConnectionFromReceivedEvent($this, $matches['email'], null));
+            $this->dispatchEvent(new ConnectionFromReceivedEvent($matches['email'], null));
         } else {
             $this->sendReply(500, 'Invalid mail argument');
         }
@@ -477,7 +484,7 @@ class Connection
             $this->recipients[$matches['email']] = $matches['name'];
             $this->sendReply(250, 'Accepted');
 
-            $this->dispatchEvent(new ConnectionRcptReceivedEvent($this, $matches['email'], $matches['name']));
+            $this->dispatchEvent(new ConnectionRcptReceivedEvent($matches['email'], $matches['name']));
         } else {
             $this->sendReply(500, 'Invalid RCPT TO argument.');
         }
@@ -512,11 +519,11 @@ class Connection
                     }
                 });
 
-            $this->dispatchEvent(new MessageReceivedEvent($this, $this->rawContent));
+            $this->dispatchEvent(new MessageReceivedEvent($this->rawContent));
         } else {
             $this->rawContent .= $line.self::DELIMITER;
 
-            $this->dispatchEvent(new ConnectionLineReceivedEvent($this, $line));
+            $this->dispatchEvent(new ConnectionLineReceivedEvent($line));
         }
     }
     /**
@@ -574,13 +581,13 @@ class Connection
             $this->changeState(self::STATUS_INIT);
             $this->sendReply(235, '2.7.0 Authentication successful');
 
-            $this->dispatchEvent(new ConnectionAuthAcceptedEvent($this, $this->authMethod));
+            $this->dispatchEvent(new ConnectionAuthAcceptedEvent($this->authMethod));
 
             return true;
         } else {
             $this->sendReply(535, 'Authentication credentials invalid');
 
-            $this->dispatchEvent(new ConnectionAuthRefusedEvent($this, $this->authMethod));
+            $this->dispatchEvent(new ConnectionAuthRefusedEvent($this->authMethod));
 
             return false;
         }
