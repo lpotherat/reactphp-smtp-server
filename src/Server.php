@@ -3,66 +3,59 @@
 namespace Smalot\Smtp\Server;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
-use React\EventLoop\LoopInterface;
+use React\Socket\ConnectionInterface;
+use React\Socket\ServerInterface;
 use Smalot\Smtp\Server\Auth\MethodInterface;
 
 /**
  * Class Server
  * @package Smalot\Smtp\Server
  */
-class Server extends \React\Socket\Server
+class Server
 {
-    /**
-     * @var int
-     */
-    public int $recipientLimit = 100;
 
     /**
-     * @var int
+     * Server constructor
+     * @param ServerInterface $server
+     * @param int $recipientLimit
+     * @param int $bannerDelay
+     * @param array $authMethods
+     * @param EventDispatcherInterface|null $dispatcher
      */
-    public int $bannerDelay = 0;
-
-    /**
-     * @var array
-     */
-    public array $authMethods = [];
-
-    /**
-     * @var LoopInterface
-     */
-    private LoopInterface $loop;
-
-    /**
-     * @var EventDispatcherInterface|null
-     */
-    protected ?EventDispatcherInterface $dispatcher;
-
-    /**
-     * Server constructor.
-     * @param LoopInterface $loop
-     */
-    public function __construct(LoopInterface $loop, ?EventDispatcherInterface $dispatcher=null)
+    public function __construct(
+        ServerInterface $server,
+        private int $recipientLimit = 100,
+        private int $bannerDelay = 0,
+        private array $authMethods = [],
+        ?EventDispatcherInterface $dispatcher=null)
     {
-        parent::__construct($loop);
-
-        // We need to save $loop here since it is private for some reason.
-        $this->loop = $loop;
-        $this->dispatcher = $dispatcher;
+        $server->on('connection',function(ConnectionInterface $connection) use ($dispatcher){
+            new Connection($connection,$this,$dispatcher);
+        });
     }
 
     /**
-     * @param resource $socket
-     * @return Connection
+     * @return int
      */
-    public function createConnection($socket): Connection
+    public function getRecipientLimit(): int
     {
-        $connection = new Connection($socket, $this->loop, $this, $this->dispatcher);
+        return $this->recipientLimit;
+    }
 
-        $connection->recipientLimit = $this->recipientLimit;
-        $connection->bannerDelay = $this->bannerDelay;
-        $connection->authMethods = $this->authMethods;
+    /**
+     * @return int
+     */
+    public function getBannerDelay(): int
+    {
+        return $this->bannerDelay;
+    }
 
-        return $connection;
+    /**
+     * @return array
+     */
+    public function getAuthMethods(): array
+    {
+        return $this->authMethods;
     }
 
     /**

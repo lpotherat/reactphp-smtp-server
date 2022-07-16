@@ -2,11 +2,11 @@
 
 namespace Smalot\Smtp\Server;
 
+use DomainException;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use React\EventLoop\LoopInterface;
-use React\EventLoop\Timer\TimerInterface;
+use React\EventLoop\Loop;
+use React\EventLoop\TimerInterface;
 use React\Socket\ConnectionInterface;
-use React\Stream\Stream;
 use Smalot\Smtp\Server\Auth\CramMd5Method;
 use Smalot\Smtp\Server\Auth\LoginMethod;
 use Smalot\Smtp\Server\Auth\MethodInterface;
@@ -25,7 +25,7 @@ use Smalot\Smtp\Server\Event\MessageReceivedEvent;
  * Class Connection
  * @package Smalot\Smtp\Server
  */
-class Connection extends Stream implements ConnectionInterface
+class Connection
 {
     const DELIMITER = "\r\n";
 
@@ -109,12 +109,6 @@ class Connection extends Stream implements ConnectionInterface
     protected int $defaultActionTimeout = 0;
 
     /**
-     * The timer for the default action, canceled in [accept] and [reject]
-     * @var TimerInterface
-     */
-    protected TimerInterface $defaultActionTimer;
-
-    /**
      * The current line buffer used by handleData.
      * @var string
      */
@@ -161,109 +155,64 @@ class Connection extends Stream implements ConnectionInterface
     public int $recipientLimit = 100;
 
     /**
-     * @var Server
+     * @var ConnectionInterface
      */
-    protected Server $server;
+    protected ConnectionInterface $connection;
 
     /**
      * @var EventDispatcherInterface|null
      */
     protected EventDispatcherInterface|null $dispatcher;
 
+    protected TimerInterface $defaultActionTimer;
+
+    private Server $server;
+
     /**
      * Connection constructor.
-     * @param resource $stream
-     * @param LoopInterface $loop
+     * @param ConnectionInterface $connection
      * @param Server $server
      * @param EventDispatcherInterface|null $dispatcher
      */
     public function __construct(
-      $stream,
-      LoopInterface $loop,
+      ConnectionInterface $connection,
       Server $server,
       ?EventDispatcherInterface $dispatcher = null
     ) {
-        parent::__construct($stream, $loop);
-
-        $this->server = $server;
+        $this->connection = $connection;
         $this->dispatcher = $dispatcher;
+        $this->server = $server;
 
-        stream_get_meta_data($stream);
-        // We sleep for 3 seconds, if client does not wait for our banner we disconnect.
-        $disconnect = fn ($data, ConnectionInterface $conn) => $conn->end("I can break rules too, bye.\n");
-        $this->on('data', $disconnect);
+        $this->recipientLimit = $this->server->getRecipientLimit();
+        $this->bannerDelay = $this->server->getBannerDelay();
+        $this->authMethods = $this->server->getAuthMethods();
+
+        $this->connection->on('data', $this->handleData(...));
         $this->reset(self::STATUS_NEW);
-        $this->on('line', $this->handleCommand(...));
-
-        if ($this->bannerDelay > 0) {
-            $loop->addTimer(
-              $this->bannerDelay,
-              function () use ($disconnect) {
-                  $this->sendReply(220, $this->banner);
-                  $this->removeListener('data', $disconnect);
-              }
-            );
-        } else {
-            $this->sendReply(220, $this->banner);
-        }
+        $this->sendReply(220, $this->banner);
     }
 
     /**
-     * We read until we find an end of line sequence for SMTP.
-     * http://www.jebriggs.com/blog/2010/07/smtp-maximum-line-lengths/
-     * @param $stream
+     * @param string|false $data
+     * @return void
      */
-    public function handleData($stream)
+    public function handleData(string|false $data)
     {
-        // Socket is raw, not using fread as it's interceptable by filters
-        // See issues #192, #209, and #240
-        $data = stream_socket_recvfrom($stream, $this->bufferSize);
-
-        //$limit = $this->state == self::STATUS_DATA ? 1000 : 512;
         if ('' !== $data && false !== $data) {
             $this->lineBuffer .= $data;
-//            if (strlen($data) > $limit) {
-//                $this->sendReply(500, 'Line length limit exceeded.'.strlen($this->lineBuffer));
-//                $this->lineBuffer = '';
-//            }
-
             $delimiter = self::DELIMITER;
             while (false !== $pos = strpos($this->lineBuffer, $delimiter)) {
                 $line = substr($this->lineBuffer, 0, $pos);
                 $this->lineBuffer = substr($this->lineBuffer, $pos + strlen($delimiter));
-                $this->emit('line', [$line, $this]);
+                $this->handleCommand($line);
             }
         }
 
-        if ('' === $data || false === $data || !is_resource($stream) || feof($stream)) {
-            $this->end();
+        if ('' === $data || false === $data) {
+            $this->connection->end();
         }
     }
 
-    /**
-     * @return MethodInterface
-     *
-    public function getAuthMethod(): MethodInterface
-    {
-        return $this->authMethod;
-    }
-
-    /**
-     * @return string
-     *
-    public function getFrom(): string
-    {
-        return $this->from;
-    }
-
-    /**
-     * @return array
-     *
-    public function getRecipients(): array
-    {
-        return $this->recipients;
-    }
-*/
     /**
      * @param Event $event
      * @return $this
@@ -330,7 +279,6 @@ class Connection extends Stream implements ConnectionInterface
         if ($command == null) {
             $this->sendReply(500, 'Unexpected or unknown command: '.$line);
             $this->sendReply(500, $this->states[$this->state]);
-
         } else {
             $func = "handle{$command}Command";
             $this->$func($line);
@@ -353,21 +301,21 @@ class Connection extends Stream implements ConnectionInterface
                 $out .= "$code-$line\r\n";
             }
 
-            $this->write($out);
+            $this->connection->write($out);
             $message = $last;
         }
 
         if ($close) {
-            $this->end("$code $message\r\n");
+            $this->connection->end("$code $message\r\n");
         } else {
-            $this->write("$code $message\r\n");
+            $this->connection->write("$code $message\r\n");
         }
     }
 
     /**
-     * @param string $domain
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleResetCommand(string $domain):void
+    private function handleResetCommand():void
     {
         $this->reset();
         $this->sendReply(250, 'Reset OK');
@@ -375,8 +323,9 @@ class Connection extends Stream implements ConnectionInterface
 
     /**
      * @param string $domain
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleHeloCommand(string $domain):void
+    private function handleHeloCommand(string $domain):void
     {
         $messages = [
           "Hello {$this->getRemoteAddress()}",
@@ -397,16 +346,18 @@ class Connection extends Stream implements ConnectionInterface
 
     /**
      * @param string $domain
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleEhloCommand(string $domain):void
+    private function handleEhloCommand(string $domain):void
     {
         $this->handleHeloCommand($domain);
     }
 
     /**
      * @param string $method
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleAuthCommand(string $method)
+    private function handleAuthCommand(string $method)
     {
         list($method, $token) = array_pad(explode(' ', trim($method), 2),2,null);
 
@@ -443,8 +394,9 @@ class Connection extends Stream implements ConnectionInterface
 
     /**
      * @param string $value
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleLoginCommand(string $value)
+    private function handleLoginCommand(string $value)
     {
         if (!$this->authMethod) {
             $this->sendReply(530, '5.7.0 Authentication required');
@@ -481,8 +433,9 @@ class Connection extends Stream implements ConnectionInterface
 
     /**
      * @param mixed $arguments
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleMailFromCommand(mixed $arguments)
+    private function handleMailFromCommand(mixed $arguments)
     {
         // Parse the email.
         if (preg_match('/:\s*<(?<email>.*)>( .*)?/', $arguments, $matches) == 1) {
@@ -504,17 +457,18 @@ class Connection extends Stream implements ConnectionInterface
     }
 
     /**
-     * @param mixed $arguments
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleQuitCommand(mixed $arguments)
+    private function handleQuitCommand()
     {
         $this->sendReply(221, 'Goodbye.', true);
     }
 
     /**
      * @param mixed $arguments
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleRcptToCommand(mixed $arguments)
+    private function handleRcptToCommand(mixed $arguments)
     {
         // Parse the recipient.
         if (preg_match('/:\s*(?<name>.*?)?<(?<email>.*)>( .*)?/', $arguments, $matches) == 1) {
@@ -530,9 +484,9 @@ class Connection extends Stream implements ConnectionInterface
     }
 
     /**
-     * @param mixed $arguments
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleDataCommand(mixed $arguments)
+    private function handleDataCommand()
     {
         $this->changeState(self::STATUS_DATA);
         $this->sendReply(354, 'Enter message, end with CRLF . CRLF');
@@ -540,25 +494,23 @@ class Connection extends Stream implements ConnectionInterface
 
     /**
      * @param string $line
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
-    protected function handleLineCommand(string $line)
+    private function handleLineCommand(string $line)
     {
         if ($line === '.') {
             $this->changeState(self::STATUS_PROCESSING);
-
             /**
              * Default action, using timer so that callbacks above can be called asynchronously.
              */
-            $this->defaultActionTimer = $this->loop->addTimer(
-              $this->defaultActionTimeout,
-              function () {
-                  if ($this->acceptByDefault) {
-                      $this->accept();
-                  } else {
-                      $this->reject();
-                  }
-              }
-            );
+            $this->defaultActionTimer = Loop::addTimer($this->defaultActionTimeout,
+                function () {
+                    if ($this->acceptByDefault) {
+                        $this->accept();
+                    } else {
+                        $this->reject();
+                    }
+                });
 
             $this->dispatchEvent(new MessageReceivedEvent($this, $this->rawContent));
         } else {
@@ -567,7 +519,34 @@ class Connection extends Stream implements ConnectionInterface
             $this->dispatchEvent(new ConnectionLineReceivedEvent($this, $line));
         }
     }
+    /**
+     * @param string $message
+     */
+    public function accept(string $message = 'OK')
+    {
+        if ($this->state != self::STATUS_PROCESSING) {
+            throw new DomainException('SMTP Connection not in a valid state to accept a message.');
+        }
+        Loop::cancelTimer($this->defaultActionTimer);
+        unset($this->defaultActionTimer);
+        $this->sendReply(250, $message);
+        $this->reset();
+    }
 
+    /**
+     * @param int $code
+     * @param string $message
+     */
+    public function reject(int $code = 550, string $message = 'Message not accepted')
+    {
+        if ($this->state != self::STATUS_PROCESSING) {
+            throw new DomainException('SMTP Connection not in a valid state to reject message.');
+        }
+        Loop::cancelTimer($this->defaultActionTimer);
+        unset($this->defaultActionTimer);
+        $this->sendReply($code, $message);
+        $this->reset();
+    }
     /**
      * Reset the SMTP session.
      * By default goes to the initialized state (ie no new EHLO or HELO is required / possible.)
@@ -583,35 +562,6 @@ class Connection extends Stream implements ConnectionInterface
         $this->rawContent = '';
         $this->authMethod = false;
         $this->login = false;
-    }
-
-    /**
-     * @param string $message
-     */
-    public function accept(string $message = 'OK')
-    {
-        if ($this->state != self::STATUS_PROCESSING) {
-            throw new \DomainException('SMTP Connection not in a valid state to accept a message.');
-        }
-        $this->loop->cancelTimer($this->defaultActionTimer);
-        unset($this->defaultActionTimer);
-        $this->sendReply(250, $message);
-        $this->reset();
-    }
-
-    /**
-     * @param int $code
-     * @param string $message
-     */
-    public function reject(int $code = 550, string $message = 'Message not accepted')
-    {
-        if ($this->state != self::STATUS_PROCESSING) {
-            throw new \DomainException('SMTP Connection not in a valid state to reject message.');
-        }
-        $this->defaultActionTimer->cancel();
-        unset($this->defaultActionTimer);
-        $this->sendReply($code, $message);
-        $this->reset();
     }
 
     /**
@@ -637,41 +587,10 @@ class Connection extends Stream implements ConnectionInterface
     }
 
     /**
-     * Delay the default action by $seconds.
-     * @param int $seconds
-     * @return bool
-     */
-    public function delay(int $seconds): bool
-    {
-        if (isset($this->defaultActionTimer)) {
-            $this->defaultActionTimer->cancel();
-            $this->defaultActionTimer = $this->loop->addTimer($seconds, $this->defaultActionTimer->getCallback());
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function handleClose()
-    {
-        if (is_resource($this->stream)) {
-            // @see http://chat.stackoverflow.com/transcript/message/7727858#7727858
-            stream_socket_shutdown($this->stream, STREAM_SHUT_RDWR);
-            stream_set_blocking($this->stream, false);
-            fclose($this->stream);
-            $this->stream = null;
-        }
-    }
-
-    /**
      * @param string $address
      * @return string
      */
-    protected function parseAddress(string $address): string
+    private function parseAddress(string $address): string
     {
         return trim(substr($address, 0, strrpos($address, ':')), '[]');
     }
@@ -681,7 +600,7 @@ class Connection extends Stream implements ConnectionInterface
      */
     public function getRemoteAddress(): string
     {
-        return $this->parseAddress(stream_socket_get_name($this->stream, true));
+        return $this->parseAddress($this->connection->getRemoteAddress());
     }
 
 }

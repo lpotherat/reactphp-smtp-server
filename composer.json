@@ -16,8 +16,8 @@
     ],
     "require": {
         "ext-openssl": "*",
-        "react/event-loop": "^0.4.2",
-        "react/socket": "^0.4.3",
+        "react/event-loop": "^v1.3.0",
+        "react/socket": "^v1.11.0",
         "psr/event-dispatcher": "^1.0.0",
         "psr/log": "^3.0.0"
     },
