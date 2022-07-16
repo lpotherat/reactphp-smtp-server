@@ -11,21 +11,21 @@ interface MethodInterface
     /**
      * @return string
      */
-    public function getType();
+    public function getType():string;
 
     /**
-     * @return string
+     * @return string|null
      */
-    public function getUsername();
+    public function getUsername():?string;
 
     /**
-     * @return string
+     * @return string|null
      */
-    public function getPassword();
+    public function getPassword():?string;
 
     /**
      * @param string $password
      * @return bool
      */
-    public function validateIdentity($password);
+    public function validateIdentity(string $password):bool;
 }

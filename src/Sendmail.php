@@ -2,9 +2,8 @@
 
 namespace Smalot\Smtp\Server;
 
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Smalot\Smtp\Server\Event\MessageSentEvent;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Class Sendmail
@@ -13,15 +12,15 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 class Sendmail
 {
     /**
-     * @var EventDispatcherInterface
+     * @var EventDispatcherInterface|null
      */
-    protected $dispatcher;
+    protected ?EventDispatcherInterface $dispatcher;
 
     /**
      * Sendmail constructor.
-     * @param EventDispatcherInterface $dispatcher
+     * @param EventDispatcherInterface|null $dispatcher
      */
-    public function __construct(EventDispatcherInterface $dispatcher = null)
+    public function __construct(?EventDispatcherInterface $dispatcher = null)
     {
         $this->dispatcher = $dispatcher;
     }
@@ -29,7 +28,7 @@ class Sendmail
     /**
      * @return bool
      */
-    public function run()
+    public function run(): bool
     {
         if (0 === ftell(STDIN)) {
             $message = '';
@@ -38,10 +37,7 @@ class Sendmail
                 $message .= fread(STDIN, 1024);
             }
 
-            if (!is_null($this->dispatcher)) {
-                $event = new MessageSentEvent($this, $message);
-                $this->dispatcher->dispatch(Events::MESSAGE_SENT, $event);
-            }
+            $this->dispatcher?->dispatch(new MessageSentEvent($this, $message));
 
             return true;
         }

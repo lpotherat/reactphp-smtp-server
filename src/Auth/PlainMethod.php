@@ -11,12 +11,12 @@ class PlainMethod implements MethodInterface
     /**
      * @var string
      */
-    protected $username;
+    protected string $username;
 
     /**
      * @var string
      */
-    protected $password;
+    protected string $password;
 
     /**
      * PlainMethod constructor.
@@ -28,7 +28,7 @@ class PlainMethod implements MethodInterface
     /**
      * @return string
      */
-    public function getType()
+    public function getType():string
     {
         return 'PLAIN';
     }
@@ -36,7 +36,7 @@ class PlainMethod implements MethodInterface
     /**
      * @return string
      */
-    public function getUsername()
+    public function getUsername():string
     {
         return $this->username;
     }
@@ -44,7 +44,7 @@ class PlainMethod implements MethodInterface
     /**
      * @return string
      */
-    public function getPassword()
+    public function getPassword():string
     {
         return $this->password;
     }
@@ -53,7 +53,7 @@ class PlainMethod implements MethodInterface
      * @param string $token
      * @return $this
      */
-    public function decodeToken($token)
+    public function decodeToken(string $token):static
     {
         $parts = explode("\000", base64_decode($token));
 
@@ -67,7 +67,7 @@ class PlainMethod implements MethodInterface
      * @param string $password
      * @return bool
      */
-    public function validateIdentity($password)
+    public function validateIdentity(string $password):bool
     {
         return $password == $this->password;
     }

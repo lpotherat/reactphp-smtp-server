@@ -3,7 +3,6 @@
 namespace Smalot\Smtp\Server\Event;
 
 use Smalot\Smtp\Server\Sendmail;
-use Symfony\Component\EventDispatcher\Event;
 
 /**
  * Class MessageSentEvent

@@ -8,35 +8,27 @@ namespace Smalot\Smtp\Server\Auth;
  */
 class LoginMethod implements MethodInterface
 {
-    /**
-     * @var string
-     */
-    protected $username;
-
-    /**
-     * @var string
-     */
-    protected $password;
 
     /**
      * LoginMethod constructor.
      */
-    public function __construct()
-    {
-    }
+    public function __construct(
+        protected ?string $username=null,
+        protected ?string $password=null
+    ){}
 
     /**
      * @return string
      */
-    public function getType()
+    public function getType():string
     {
         return 'LOGIN';
     }
 
     /**
-     * @return string
+     * @return string|null
      */
-    public function getUsername()
+    public function getUsername():?string
     {
         return $this->username;
     }
@@ -45,7 +37,7 @@ class LoginMethod implements MethodInterface
      * @param string $user
      * @return $this
      */
-    public function setUsername($user)
+    public function setUsername(string $user):static
     {
         $this->username = base64_decode($user);
 
@@ -53,9 +45,9 @@ class LoginMethod implements MethodInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
-    public function getPassword()
+    public function getPassword():?string
     {
         return $this->password;
     }
@@ -64,7 +56,7 @@ class LoginMethod implements MethodInterface
      * @param string $password
      * @return $this
      */
-    public function setPassword($password)
+    public function setPassword(string $password):static
     {
         $this->password = base64_decode($password);
 
@@ -75,7 +67,7 @@ class LoginMethod implements MethodInterface
      * @param string $password
      * @return bool
      */
-    public function validateIdentity($password)
+    public function validateIdentity(string $password):bool
     {
         return $password == $this->password;
     }

@@ -4,7 +4,6 @@ namespace Smalot\Smtp\Server\Event;
 
 use Smalot\Smtp\Server\Auth\MethodInterface;
 use Smalot\Smtp\Server\Connection;
-use Symfony\Component\EventDispatcher\Event;
 
 /**
  * Class ConnectionAuthRefusedEvent

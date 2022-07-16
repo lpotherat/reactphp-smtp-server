@@ -2,9 +2,9 @@
 
 namespace Smalot\Smtp\Server;
 
+use Psr\EventDispatcher\EventDispatcherInterface;
 use React\EventLoop\LoopInterface;
 use Smalot\Smtp\Server\Auth\MethodInterface;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Class Server
@@ -15,33 +15,33 @@ class Server extends \React\Socket\Server
     /**
      * @var int
      */
-    public $recipientLimit = 100;
+    public int $recipientLimit = 100;
 
     /**
      * @var int
      */
-    public $bannerDelay = 0;
+    public int $bannerDelay = 0;
 
     /**
      * @var array
      */
-    public $authMethods = [];
+    public array $authMethods = [];
 
     /**
      * @var LoopInterface
      */
-    private $loop;
+    private LoopInterface $loop;
 
     /**
-     * @var EventDispatcherInterface
+     * @var EventDispatcherInterface|null
      */
-    protected $dispatcher;
+    protected ?EventDispatcherInterface $dispatcher;
 
     /**
      * Server constructor.
      * @param LoopInterface $loop
      */
-    public function __construct(LoopInterface $loop, EventDispatcherInterface $dispatcher)
+    public function __construct(LoopInterface $loop, ?EventDispatcherInterface $dispatcher=null)
     {
         parent::__construct($loop);
 
@@ -54,7 +54,7 @@ class Server extends \React\Socket\Server
      * @param resource $socket
      * @return Connection
      */
-    public function createConnection($socket)
+    public function createConnection($socket): Connection
     {
         $connection = new Connection($socket, $this->loop, $this, $this->dispatcher);
 
@@ -70,7 +70,7 @@ class Server extends \React\Socket\Server
      * @param MethodInterface $method
      * @return bool
      */
-    public function checkAuth(Connection $connection, MethodInterface $method)
+    public function checkAuth(Connection $connection, MethodInterface $method): bool
     {
         return true;
     }

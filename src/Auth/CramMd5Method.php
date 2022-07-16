@@ -2,6 +2,8 @@
 
 namespace Smalot\Smtp\Server\Auth;
 
+use JetBrains\PhpStorm\Pure;
+
 /**
  * Class CramMd5Method
  * @package Smalot\Smtp\Server\Auth
@@ -11,17 +13,17 @@ class CramMd5Method implements MethodInterface
     /**
      * @var string
      */
-    protected $challenge;
+    protected string $challenge;
 
     /**
      * @var string
      */
-    protected $username;
+    protected string $username;
 
     /**
      * @var string
      */
-    protected $password;
+    protected string $password;
 
     /**
      * LoginMethod constructor.
@@ -34,19 +36,16 @@ class CramMd5Method implements MethodInterface
     /**
      * @return string
      */
-    protected function generateChallenge()
+    protected function generateChallenge(): string
     {
-        $strong = true;
-        $random = openssl_random_pseudo_bytes(32, $strong);
-        $challenge = '<'.bin2hex($random).'@react-smtp.tld>';
-
-        return $challenge;
+        $random = openssl_random_pseudo_bytes(32);
+        return '<'.bin2hex($random).'@react-smtp.tld>';
     }
 
     /**
      * @return string
      */
-    public function getType()
+    public function getType():string
     {
         return 'CRAM-MD5';
     }
@@ -54,7 +53,7 @@ class CramMd5Method implements MethodInterface
     /**
      * @return string
      */
-    public function getChallenge()
+    public function getChallenge():string
     {
         return base64_encode($this->challenge);
     }
@@ -62,7 +61,7 @@ class CramMd5Method implements MethodInterface
     /**
      * @return string
      */
-    public function getUsername()
+    public function getUsername():string
     {
         return $this->username;
     }
@@ -70,7 +69,7 @@ class CramMd5Method implements MethodInterface
     /**
      * @return string
      */
-    public function getPassword()
+    public function getPassword():string
     {
         return $this->password;
     }
@@ -79,7 +78,7 @@ class CramMd5Method implements MethodInterface
      * @param string $token
      * @return $this
      */
-    public function decodeToken($token)
+    public function decodeToken(string $token):static
     {
         list($username, $password) = explode(' ', base64_decode($token));
 
@@ -93,11 +92,11 @@ class CramMd5Method implements MethodInterface
      * @param string $password
      * @return bool
      */
-    public function validateIdentity($password)
+    public function validateIdentity(string $password):bool
     {
         $hashMd5 = $this->_hmacMd5($password, $this->challenge);
 
-        return $hashMd5 == $this->password;
+        return $hashMd5 === $this->password;
     }
 
     /**
@@ -108,7 +107,7 @@ class CramMd5Method implements MethodInterface
      * @param int $block
      * @return string
      */
-    protected function _hmacMd5($key, $data, $block = 64)
+    protected function _hmacMd5(string $key, string $data, int $block = 64):string
     {
         if (strlen($key) > 64) {
             $key = pack('H32', md5($key));
@@ -118,8 +117,6 @@ class CramMd5Method implements MethodInterface
         $k_ipad = substr($key, 0, 64) ^ str_repeat(chr(0x36), 64);
         $k_opad = substr($key, 0, 64) ^ str_repeat(chr(0x5C), 64);
         $inner = pack('H32', md5($k_ipad.$data));
-        $digest = md5($k_opad.$inner);
-
-        return $digest;
+        return md5($k_opad.$inner);
     }
 }

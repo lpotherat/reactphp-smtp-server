@@ -2,20 +2,19 @@
 
 namespace Smalot\Smtp\Server\Event;
 
+use Psr\EventDispatcher\ListenerProviderInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
 use Smalot\Smtp\Server\Events;
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
  * Class LogSubscriber
  * @package Smalot\Smtp\Server\Event
  */
-class LogSubscriber implements EventSubscriberInterface
+class LogSubscriber implements ListenerProviderInterface,LoggerAwareInterface
 {
-    /**
-     * @var LoggerInterface
-     */
-    protected $logger;
+    use LoggerAwareTrait;
 
     /**
      * LogSubscriber constructor.
@@ -23,25 +22,26 @@ class LogSubscriber implements EventSubscriberInterface
      */
     public function __construct(LoggerInterface $logger)
     {
-        $this->logger = $logger;
+        $this->setLogger($logger);
     }
 
     /**
-     * @inheritdoc
+     * @param object $event
+     * @return iterable
      */
-    public static function getSubscribedEvents()
+    public function getListenersForEvent(object $event): iterable
     {
-        return [
-          Events::CONNECTION_CHANGE_STATE => 'onConnectionChangeState',
-          Events::CONNECTION_HELO_RECEIVED => 'onConnectionHeloReceived',
-          Events::CONNECTION_AUTH_ACCEPTED => 'onConnectionAuthAccepted',
-          Events::CONNECTION_AUTH_REFUSED => 'onConnectionAuthRefused',
-          Events::CONNECTION_FROM_RECEIVED => 'onConnectionFromReceived',
-          Events::CONNECTION_RCPT_RECEIVED => 'onConnectionRcptReceived',
-          Events::CONNECTION_LINE_RECEIVED => 'onConnectionLineReceived',
-          Events::MESSAGE_RECEIVED => 'onMessageReceived',
-          Events::MESSAGE_SENT => 'onMessageSent',
-        ];
+        return match ($event::class){
+            ConnectionAuthAcceptedEvent::class => [$this->onConnectionAuthAccepted(...)],
+            ConnectionAuthRefusedEvent::class => [$this->onConnectionAuthRefused(...)],
+            ConnectionChangeStateEvent::class => [$this->onConnectionChangeState(...)],
+            ConnectionFromReceivedEvent::class => [$this->onConnectionFromReceived(...)],
+            ConnectionHeloReceivedEvent::class => [$this->onConnectionHeloReceived(...)],
+            ConnectionLineReceivedEvent::class => [$this->onConnectionLineReceived(...)],
+            ConnectionRcptReceivedEvent::class => [$this->onConnectionRcptReceived(...)],
+            MessageSentEvent::class => [$this->onMessageSent(...)],
+            MessageReceivedEvent::class => [$this->onMessageReceived(...)],
+        };
     }
 
     /**
@@ -121,4 +121,5 @@ class LogSubscriber implements EventSubscriberInterface
     {
         $this->logger->info('Message sent via sendmail: '.strlen($event->getMessage()).' bytes');
     }
+
 }
